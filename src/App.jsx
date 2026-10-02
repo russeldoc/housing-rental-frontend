@@ -12,6 +12,13 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 
+import ProtectedRoute from "./routes/ProtectedRoute";
+import AdminRoute from "./routes/AdminRoute";
+
+import UserDashboard from "./pages/dashboard/UserDashboard";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
+
+
 function App() {
   return (
     <div className="min-h-screen flex flex-col">
@@ -36,9 +43,23 @@ function App() {
 
           <Route path="/signup" element={<Signup />} />
 
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
-            path="/forgot-password"
-            element={<ForgotPassword />}
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <UserDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
           />
 
         </Routes>
