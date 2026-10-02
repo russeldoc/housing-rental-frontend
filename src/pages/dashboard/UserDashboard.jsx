@@ -42,13 +42,16 @@ const UserDashboard = () => {
                         </div>
                     </Link>
 
-                    <div className="card bg-base-100 shadow-md">
+                    <Link
+                        to="/my-requests"
+                        className="card bg-base-100 shadow-md hover:shadow-xl"
+                    >
                         <div className="card-body">
                             <FaClipboardList className="text-3xl text-primary" />
                             <h2 className="card-title mt-2">My Rental Requests</h2>
-                            <p>Your rental requests will appear here once implemented.</p>
+                            <p>View and track your rental requests.</p>
                         </div>
-                    </div>
+                    </Link>
 
                     <div className="card bg-base-100 shadow-md">
                         <div className="card-body">

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
@@ -10,6 +10,8 @@ const Login = () => {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+
+    const location = useLocation();
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -40,10 +42,14 @@ const Login = () => {
 
         toast.success("Login successful!");
 
-        if (safeUser.role === "admin") {
-            navigate("/admin");
+        const requestedPath = location.state?.from?.pathname;
+
+        if (requestedPath?.startsWith("/") && !requestedPath.startsWith("//")) {
+            navigate(requestedPath, { replace: true });
+        } else if (safeUser.role === "admin") {
+            navigate("/admin", { replace: true });
         } else {
-            navigate("/dashboard");
+            navigate("/dashboard", { replace: true });
         }
     };
 

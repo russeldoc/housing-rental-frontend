@@ -18,6 +18,9 @@ import AdminRoute from "./routes/AdminRoute";
 import UserDashboard from "./pages/dashboard/UserDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
 
+import RentalRequest from "./pages/user/RentalRequest";
+import MyRequests from "./pages/user/MyRequests";
+
 
 function App() {
   return (
@@ -59,6 +62,24 @@ function App() {
               <AdminRoute>
                 <AdminDashboard />
               </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/properties/:id/request"
+            element={
+              <ProtectedRoute>
+                <RentalRequest />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/my-requests"
+            element={
+              <ProtectedRoute>
+                <MyRequests />
+              </ProtectedRoute>
             }
           />
 

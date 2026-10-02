@@ -189,9 +189,12 @@ const PropertyDetails = () => {
                                 </p>
                             </div>
 
-                            <button className="btn btn-secondary">
+                            <Link
+                                to={`/properties/${property.id}/request`}
+                                className="btn btn-secondary"
+                            >
                                 Request to Rent
-                            </button>
+                            </Link>
 
                         </div>
 
