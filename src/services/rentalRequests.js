@@ -1,16 +1,23 @@
 
+
 const STORAGE_KEY = "rentalRequests";
 
 export const getRentalRequests = () => {
     try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
+        return JSON.parse(
+            localStorage.getItem(STORAGE_KEY) || "[]"
+        );
+    } catch (error) {
+        console.error("Error loading rental requests:", error);
         return [];
     }
+
 };
+
 
 export const createRentalRequest = (request) => {
     const requests = getRentalRequests();
+
 
     // Prevent the same user from submitting another pending
     // request for the same property.
@@ -42,4 +49,28 @@ export const createRentalRequest = (request) => {
         success: true,
         request: newRequest,
     };
+};
+
+
+export const updateRentalRequestStatus = (requestId, newStatus) => {
+    const allowedStatuses = ["Approved", "Rejected"];
+
+    if (!allowedStatuses.includes(newStatus)) {
+        return false;
+    }
+
+    const requests = getRentalRequests();
+
+    const updatedRequests = requests.map((request) =>
+        request.id === requestId && request.status === "Pending"
+            ? { ...request, status: newStatus }
+            : request
+    );
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRequests));
+
+    return updatedRequests.some(
+        (request) =>
+            request.id === requestId && request.status === newStatus
+    );
 };

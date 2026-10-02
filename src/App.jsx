@@ -20,6 +20,7 @@ import AdminDashboard from "./pages/dashboard/AdminDashboard";
 
 import RentalRequest from "./pages/user/RentalRequest";
 import MyRequests from "./pages/user/MyRequests";
+import RentalRequests from "./pages/admin/RentalRequests";
 
 
 function App() {
@@ -80,6 +81,15 @@ function App() {
               <ProtectedRoute>
                 <MyRequests />
               </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/requests"
+            element={
+              <AdminRoute>
+                <RentalRequests />
+              </AdminRoute>
             }
           />
 
