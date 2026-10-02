@@ -9,6 +9,19 @@ const properties = [
         area: 1100,
         type: "Apartment",
         status: "Available",
+
+        description:
+            "A modern and comfortable 2 bedroom apartment located in Uttara. The apartment is suitable for a small family and is close to schools, shopping areas, restaurants and public transportation.",
+
+        amenities: [
+            "Parking",
+            "24/7 Security",
+            "Generator",
+            "Lift",
+            "Gas Connection",
+            "Balcony",
+        ],
+
         image:
             "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=80",
     },
