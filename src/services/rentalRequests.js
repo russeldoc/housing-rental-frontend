@@ -1,4 +1,5 @@
 
+import { updateProperty } from "./propertyStorage";
 
 const STORAGE_KEY = "rentalRequests";
 
@@ -11,48 +12,76 @@ export const getRentalRequests = () => {
         console.error("Error loading rental requests:", error);
         return [];
     }
-
 };
-
 
 export const createRentalRequest = (request) => {
     const requests = getRentalRequests();
 
+    const userEmail = request.userEmail?.trim().toLowerCase();
+    const propertyId = String(request.propertyId);
 
-    // Prevent the same user from submitting another pending
-    // request for the same property.
-    const alreadyPending = requests.some(
+    // Prevent requests for properties already approved for someone.
+    const approvedRequest = requests.find(
         (item) =>
-            item.userEmail === request.userEmail &&
-            item.propertyId === request.propertyId &&
-            item.status === "Pending"
+            String(item.propertyId) === propertyId &&
+            item.status === "Approved"
     );
 
-    if (alreadyPending) {
+    if (approvedRequest) {
         return {
             success: false,
-            message: "You already have a pending request for this property.",
+            message: "Sorry, this property is not available anymore.",
+        };
+    }
+
+    // Prevent the same user from requesting the same property again.
+    const existingRequest = requests.find(
+        (item) =>
+            item.userEmail?.trim().toLowerCase() === userEmail &&
+            String(item.propertyId) === propertyId
+    );
+
+    if (existingRequest) {
+        return {
+            success: false,
+            message: `You have already requested this property. Current status: ${existingRequest.status}.`,
         };
     }
 
     const newRequest = {
-        id: Date.now(),
         ...request,
+        userEmail,
+        id: Date.now(),
         status: "Pending",
         createdAt: new Date().toISOString(),
     };
 
-    requests.push(newRequest);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+    try {
+        requests.push(newRequest);
 
-    return {
-        success: true,
-        request: newRequest,
-    };
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(requests)
+        );
+
+        return {
+            success: true,
+            request: newRequest,
+        };
+    } catch (error) {
+        console.error("Error saving rental request:", error);
+
+        return {
+            success: false,
+            message: "Could not save your rental request. Please try again.",
+        };
+    }
 };
 
-
-export const updateRentalRequestStatus = (requestId, newStatus) => {
+export const updateRentalRequestStatus = (
+    requestId,
+    newStatus
+) => {
     const allowedStatuses = ["Approved", "Rejected"];
 
     if (!allowedStatuses.includes(newStatus)) {
@@ -61,16 +90,37 @@ export const updateRentalRequestStatus = (requestId, newStatus) => {
 
     const requests = getRentalRequests();
 
+    const targetRequest = requests.find(
+        (request) =>
+            String(request.id) === String(requestId)
+    );
+
+    if (!targetRequest || targetRequest.status !== "Pending") {
+        return false;
+    }
+
     const updatedRequests = requests.map((request) =>
-        request.id === requestId && request.status === "Pending"
+        String(request.id) === String(requestId)
             ? { ...request, status: newStatus }
             : request
     );
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRequests));
+    try {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(updatedRequests)
+        );
 
-    return updatedRequests.some(
-        (request) =>
-            request.id === requestId && request.status === newStatus
-    );
+        // Mark the property unavailable when the request is approved.
+        if (newStatus === "Approved") {
+            updateProperty(targetRequest.propertyId, {
+                availability: "Not Available",
+            });
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Error updating rental request:", error);
+        return false;
+    }
 };

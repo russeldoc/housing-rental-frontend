@@ -1,3 +1,5 @@
+
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
     FaMapMarkerAlt,
@@ -9,14 +11,78 @@ import {
     FaArrowLeft,
 } from "react-icons/fa";
 
-import properties from "../data/properties";
+import { useAuth } from "../context/AuthContext";
+import {
+    getProperties,
+    subscribeToPropertyChanges,
+} from "../services/propertyStorage";
+import { getRentalRequests } from "../services/rentalRequests";
 
 const PropertyDetails = () => {
     const { id } = useParams();
+    const { authUser } = useAuth();
 
-    const property = properties.find(
-        (item) => item.id === Number(id)
+    const [property, setProperty] = useState(() =>
+        getProperties().find((item) => String(item.id) === String(id))
     );
+
+    const [existingRequest, setExistingRequest] = useState(null);
+
+    const isUnavailable =
+        property?.availability === "Not Available";
+
+    useEffect(() => {
+        const refreshProperty = () => {
+            const updatedProperty = getProperties().find(
+                (item) => String(item.id) === String(id)
+            );
+
+            setProperty(updatedProperty);
+        };
+
+        refreshProperty();
+
+        return subscribeToPropertyChanges(refreshProperty);
+    }, [id]);
+
+    useEffect(() => {
+        const refreshRequest = () => {
+            if (!authUser?.email) {
+                setExistingRequest(null);
+                return;
+            }
+
+            const userEmail = authUser.email.trim().toLowerCase();
+
+            const request = getRentalRequests().find(
+                (item) =>
+                    item.userEmail?.trim().toLowerCase() === userEmail &&
+                    String(item.propertyId) === String(id)
+            );
+
+            setExistingRequest(request || null);
+        };
+
+        refreshRequest();
+
+        window.addEventListener("focus", refreshRequest);
+
+        const handleStorageChange = (event) => {
+            if (
+                event.key === "rentalRequests" ||
+                event.key === null
+            ) {
+                refreshRequest();
+            }
+        };
+
+        window.addEventListener("storage", handleStorageChange);
+
+        return () => {
+            window.removeEventListener("focus", refreshRequest);
+            window.removeEventListener("storage", handleStorageChange);
+        };
+    }, [id, authUser?.email]);
 
     if (!property) {
         return (
@@ -37,23 +103,21 @@ const PropertyDetails = () => {
         );
     }
 
+    const statusClass = (status) => {
+        if (status === "Approved") return "badge-success";
+        if (status === "Rejected") return "badge-error";
+        return "badge-warning";
+    };
+
     return (
         <div className="bg-base-200 min-h-screen">
             <main className="max-w-7xl mx-auto px-6 py-10">
-
-                {/* Back Button */}
-                <Link
-                    to="/properties"
-                    className="btn btn-ghost mb-6"
-                >
+                <Link to="/properties" className="btn btn-ghost mb-6">
                     <FaArrowLeft />
                     Back to Properties
                 </Link>
 
-                {/* Main Property Section */}
                 <div className="bg-base-100 rounded-2xl shadow-md overflow-hidden">
-
-                    {/* Image */}
                     <img
                         src={property.image}
                         alt={property.title}
@@ -61,13 +125,17 @@ const PropertyDetails = () => {
                     />
 
                     <div className="p-6 md:p-10">
-
-                        {/* Title & Status */}
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-
                             <div>
-                                <div className="badge badge-primary mb-3">
-                                    {property.status}
+                                <div
+                                    className={`badge mb-3 ${isUnavailable
+                                            ? "badge-error"
+                                            : "badge-primary"
+                                        }`}
+                                >
+                                    {isUnavailable
+                                        ? "Not Available"
+                                        : property.status}
                                 </div>
 
                                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -82,20 +150,16 @@ const PropertyDetails = () => {
 
                             <div>
                                 <p className="text-3xl font-bold text-primary">
-                                    ৳{property.price.toLocaleString()}
+                                    ৳{Number(property.price).toLocaleString()}
                                 </p>
 
-                                <p className="text-gray-500">
-                                    per month
-                                </p>
+                                <p className="text-gray-500">per month</p>
                             </div>
                         </div>
 
-                        <div className="divider"></div>
+                        <div className="divider" />
 
-                        {/* Property Information */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
                             <div className="bg-base-200 rounded-xl p-5 text-center">
                                 <FaBed className="text-2xl mx-auto mb-2 text-primary" />
                                 <p className="font-bold text-lg">
@@ -135,10 +199,8 @@ const PropertyDetails = () => {
                                     Property Type
                                 </p>
                             </div>
-
                         </div>
 
-                        {/* Description */}
                         <div className="mt-10">
                             <h2 className="text-2xl font-bold mb-4">
                                 About This Property
@@ -150,14 +212,12 @@ const PropertyDetails = () => {
                             </p>
                         </div>
 
-                        {/* Amenities */}
                         <div className="mt-10">
                             <h2 className="text-2xl font-bold mb-5">
                                 Amenities
                             </h2>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-
                                 {(property.amenities || []).map(
                                     (amenity, index) => (
                                         <div
@@ -167,37 +227,69 @@ const PropertyDetails = () => {
                                             <div className="text-success">
                                                 <FaCheck />
                                             </div>
-
                                             <span>{amenity}</span>
                                         </div>
                                     )
                                 )}
-
                             </div>
                         </div>
 
-                        {/* Request Section */}
                         <div className="mt-10 bg-primary text-primary-content rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-5">
-
                             <div>
                                 <h2 className="text-2xl font-bold">
                                     Interested in this property?
                                 </h2>
 
                                 <p className="mt-2 opacity-90">
-                                    Submit a rental request to get started.
+                                    {isUnavailable
+                                        ? "This property has already been approved for another renter and is no longer available."
+                                        : existingRequest
+                                            ? "You have already submitted a rental request for this property."
+                                            : "Submit a rental request to get started."}
                                 </p>
                             </div>
 
-                            <Link
-                                to={`/properties/${property.id}/request`}
-                                className="btn btn-secondary"
-                            >
-                                Request to Rent
-                            </Link>
+                            {isUnavailable ? (
+                                <span className="badge badge-error badge-lg">
+                                    Not Available
+                                </span>
+                            ) : existingRequest ? (
+                                <div className="text-center">
+                                    <span
+                                        className={`badge badge-lg ${statusClass(
+                                            existingRequest.status
+                                        )}`}
+                                    >
+                                        {existingRequest.status}
+                                    </span>
 
+                                    <p className="text-sm mt-2">
+                                        Request already submitted
+                                    </p>
+
+                                    <Link
+                                        to="/my-requests"
+                                        className="btn btn-outline mt-3"
+                                    >
+                                        View My Requests
+                                    </Link>
+                                </div>
+                            ) : authUser ? (
+                                <Link
+                                    to={`/properties/${property.id}/request`}
+                                    className="btn btn-secondary"
+                                >
+                                    Request to Rent
+                                </Link>
+                            ) : (
+                                <Link
+                                    to="/login"
+                                    className="btn btn-secondary"
+                                >
+                                    Login to Request
+                                </Link>
+                            )}
                         </div>
-
                     </div>
                 </div>
             </main>

@@ -92,4 +92,5 @@ const properties = [
     },
 ];
 
+export { properties };
 export default properties;

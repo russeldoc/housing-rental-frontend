@@ -22,6 +22,9 @@ import RentalRequest from "./pages/user/RentalRequest";
 import MyRequests from "./pages/user/MyRequests";
 import RentalRequests from "./pages/admin/RentalRequests";
 
+import ManageProperties from "./pages/admin/ManageProperties";
+import AddProperty from "./pages/admin/AddProperty";
+import EditProperty from "./pages/admin/EditProperty";
 
 function App() {
   return (
@@ -89,6 +92,32 @@ function App() {
             element={
               <AdminRoute>
                 <RentalRequests />
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/properties"
+            element={
+              <AdminRoute>
+                <ManageProperties />
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/properties/add"
+            element={
+              <AdminRoute>
+                <AddProperty />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/properties/edit/:id"
+            element={
+              <AdminRoute>
+                <EditProperty />
               </AdminRoute>
             }
           />

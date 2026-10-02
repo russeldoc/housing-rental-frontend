@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaClipboardList, FaMapMarkerAlt } from "react-icons/fa";
 
@@ -10,15 +10,51 @@ const MyRequests = () => {
     const { authUser } = useAuth();
     const [requests, setRequests] = useState([]);
 
-    useEffect(() => {
-        const allRequests = getRentalRequests();
+    const loadMyRequests = useCallback(() => {
+        if (!authUser?.email) {
+            setRequests([]);
+            return;
+        }
 
-        const myRequests = allRequests.filter(
-            (request) => request.userEmail === authUser?.email
-        );
+        const userEmail = authUser.email.trim().toLowerCase();
+
+        const myRequests = getRentalRequests()
+            .filter(
+                (request) =>
+                    request.userEmail?.trim().toLowerCase() === userEmail
+            )
+            .sort(
+                (a, b) =>
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+            );
 
         setRequests(myRequests);
-    }, [authUser]);
+    }, [authUser?.email]);
+
+    useEffect(() => {
+        loadMyRequests();
+
+        // Refresh when the user returns to this browser tab.
+        window.addEventListener("focus", loadMyRequests);
+
+        // Refresh if rental requests change in another tab.
+        const handleStorageChange = (event) => {
+            if (
+                event.key === "rentalRequests" ||
+                event.key === null
+            ) {
+                loadMyRequests();
+            }
+        };
+
+        window.addEventListener("storage", handleStorageChange);
+
+        return () => {
+            window.removeEventListener("focus", loadMyRequests);
+            window.removeEventListener("storage", handleStorageChange);
+        };
+    }, [loadMyRequests]);
 
     const statusClass = (status) => {
         if (status === "Approved") return "badge-success";
@@ -29,7 +65,10 @@ const MyRequests = () => {
     return (
         <div className="min-h-screen bg-base-200 px-4 py-10">
             <div className="max-w-5xl mx-auto">
-                <h1 className="text-3xl font-bold">My Rental Requests</h1>
+                <h1 className="text-3xl font-bold">
+                    My Rental Requests
+                </h1>
+
                 <p className="text-gray-500 mt-2 mb-8">
                     Track the status of your property rental requests.
                 </p>
@@ -38,13 +77,20 @@ const MyRequests = () => {
                     <div className="card bg-base-100 shadow-md">
                         <div className="card-body items-center text-center py-14">
                             <FaClipboardList className="text-5xl text-gray-400" />
+
                             <h2 className="text-xl font-bold mt-3">
                                 No Rental Requests Yet
                             </h2>
+
                             <p className="text-gray-500">
-                                Browse properties and submit a rental request to get started.
+                                Browse properties and submit a rental request
+                                to get started.
                             </p>
-                            <Link to="/properties" className="btn btn-primary mt-3">
+
+                            <Link
+                                to="/properties"
+                                className="btn btn-primary mt-3"
+                            >
                                 Browse Properties
                             </Link>
                         </div>
@@ -52,42 +98,61 @@ const MyRequests = () => {
                 ) : (
                     <div className="space-y-5">
                         {requests.map((request) => (
-                            <div key={request.id} className="card bg-base-100 shadow-md">
+                            <div
+                                key={request.id}
+                                className="card bg-base-100 shadow-md"
+                            >
                                 <div className="card-body">
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                         <div>
                                             <h2 className="card-title">
-                                                {request.propertyTitle}
+                                                {request.propertyTitle ||
+                                                    "Property details unavailable"}
                                             </h2>
+
                                             <p className="flex items-center gap-2 text-gray-500 mt-2">
                                                 <FaMapMarkerAlt />
-                                                {request.propertyLocation}
+                                                {request.propertyLocation ||
+                                                    "Location unavailable"}
                                             </p>
                                         </div>
 
-                                        <span className={`badge ${statusClass(request.status)}`}>
-                                            {request.status}
+                                        <span
+                                            className={`badge ${statusClass(
+                                                request.status
+                                            )}`}
+                                        >
+                                            {request.status || "Pending"}
                                         </span>
                                     </div>
 
                                     <p className="mt-3">
                                         <strong>Monthly rent:</strong>{" "}
-                                        ৳{request.monthlyRent.toLocaleString()}
+                                        {request.monthlyRent != null
+                                            ? `৳${Number(
+                                                request.monthlyRent
+                                            ).toLocaleString()}`
+                                            : "Not available"}
                                     </p>
 
                                     <p>
                                         <strong>Preferred move-in:</strong>{" "}
-                                        {request.moveInDate}
+                                        {request.moveInDate || "Not specified"}
                                     </p>
 
                                     <p>
                                         <strong>Submitted:</strong>{" "}
-                                        {new Date(request.createdAt).toLocaleDateString()}
+                                        {request.createdAt
+                                            ? new Date(
+                                                request.createdAt
+                                            ).toLocaleDateString()
+                                            : "Date unavailable"}
                                     </p>
 
                                     {request.message && (
                                         <p className="text-gray-600 mt-2">
-                                            <strong>Your message:</strong> {request.message}
+                                            <strong>Your message:</strong>{" "}
+                                            {request.message}
                                         </p>
                                     )}
 

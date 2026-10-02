@@ -1,11 +1,27 @@
+
 import { Link } from "react-router-dom";
 import { FaSearch, FaArrowRight } from "react-icons/fa";
+import { useEffect, useState } from "react";
 
 import PropertyCard from "../components/PropertyCard";
-import properties from "../data/properties";
+import {
+    getProperties,
+    subscribeToPropertyChanges,
+} from "../services/propertyStorage";
+
+
 
 const Home = () => {
+    const [properties, setProperties] = useState(() => getProperties());
+
+    useEffect(() => {
+        return subscribeToPropertyChanges(() => {
+            setProperties(getProperties());
+        });
+    }, []);
+
     const featuredProperties = properties.slice(0, 3);
+
 
     return (
         <div>
