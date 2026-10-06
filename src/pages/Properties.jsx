@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -9,16 +8,15 @@ import {
 
 import PropertyCard from "../components/PropertyCard";
 import EmptyState from "../components/EmptyState";
-import {
-    getProperties,
-    subscribeToPropertyChanges,
-} from "../services/propertyStorage";
+import { apiRequest } from "../services/api";
 
 
 const Properties = () => {
-    const [properties, setProperties] = useState(() => getProperties());
+    const [properties, setProperties] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
+
     const [search, setSearch] = useState("");
-    const [propertyType, setPropertyType] = useState("All");
     const [maxPrice, setMaxPrice] = useState("All");
     const [bedrooms, setBedrooms] = useState("All");
     const [sortBy, setSortBy] = useState("default");
@@ -26,15 +24,41 @@ const Properties = () => {
 
     const propertiesPerPage = 6;
 
+    // Get properties from FastAPI backend
     useEffect(() => {
-        return subscribeToPropertyChanges(() => {
-            setProperties(getProperties());
-            setCurrentPage(1);
-        });
-    }, []);
+        const loadProperties = async () => {
+            try {
+                setIsLoading(true);
+                setError("");
 
-    // Keep your existing filtering, sorting,
-    // pagination, and JSX below this point.
+                const data = await apiRequest(
+                    "/properties/?page=1&page_size=100&is_available=true"
+                );
+                // console.log("Properties from backend:", data.items);
+                // console.log("First property:", data.items[0]);
+                // console.log("Image URL:", data.items[0]?.image_url);
+
+                console.log(
+                    "Property images:",
+                    data.items.map((property) => ({
+                        id: property.id,
+                        title: property.title,
+                        image_url: property.image_url,
+                    }))
+                );
+
+                // Backend returns { items, total, ... }
+                setProperties(data.items || []);
+            } catch (error) {
+                console.error("Failed to load properties:", error);
+                setError(error.message || "Failed to load properties.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadProperties();
+    }, []);
 
 
     // Filter + Search + Sort
@@ -47,50 +71,48 @@ const Properties = () => {
 
             result = result.filter(
                 (property) =>
-                    property.title.toLowerCase().includes(searchText) ||
-                    property.location.toLowerCase().includes(searchText)
-            );
-        }
-
-        // Property Type
-        if (propertyType !== "All") {
-            result = result.filter(
-                (property) => property.type === propertyType
+                    property.title?.toLowerCase().includes(searchText) ||
+                    property.location?.toLowerCase().includes(searchText)
             );
         }
 
         // Maximum Price
         if (maxPrice !== "All") {
             result = result.filter(
-                (property) => property.price <= Number(maxPrice)
+                (property) =>
+                    Number(property.monthly_rent) <= Number(maxPrice)
             );
         }
 
         // Bedrooms
         if (bedrooms !== "All") {
             result = result.filter(
-                (property) => property.bedrooms >= Number(bedrooms)
+                (property) =>
+                    Number(property.bedrooms) >= Number(bedrooms)
             );
         }
 
         // Sorting
         if (sortBy === "price-low") {
-            result.sort((a, b) => a.price - b.price);
+            result.sort(
+                (a, b) =>
+                    Number(a.monthly_rent) -
+                    Number(b.monthly_rent)
+            );
         }
 
         if (sortBy === "price-high") {
-            result.sort((a, b) => b.price - a.price);
-        }
-
-        if (sortBy === "area-large") {
-            result.sort((a, b) => b.area - a.area);
+            result.sort(
+                (a, b) =>
+                    Number(b.monthly_rent) -
+                    Number(a.monthly_rent)
+            );
         }
 
         return result;
     }, [
         properties,
         search,
-        propertyType,
         maxPrice,
         bedrooms,
         sortBy,
@@ -111,15 +133,16 @@ const Properties = () => {
     // Reset filters
     const clearFilters = () => {
         setSearch("");
-        setPropertyType("All");
         setMaxPrice("All");
         setBedrooms("All");
         setSortBy("default");
         setCurrentPage(1);
     };
 
+
     return (
         <div className="bg-base-200 min-h-screen">
+
             {/* Header */}
             <section className="bg-primary text-primary-content">
                 <div className="max-w-7xl mx-auto px-6 py-14">
@@ -140,8 +163,10 @@ const Properties = () => {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-6 py-10">
+
                 {/* Search & Filter Panel */}
                 <div className="bg-base-100 rounded-2xl shadow-md p-5 mb-10">
+
                     {/* Search */}
                     <div className="relative mb-5">
                         <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -159,29 +184,7 @@ const Properties = () => {
                     </div>
 
                     {/* Filters */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Property Type */}
-                        <div>
-                            <label className="label">
-                                <span className="label-text font-semibold">
-                                    Property Type
-                                </span>
-                            </label>
-
-                            <select
-                                value={propertyType}
-                                onChange={(e) => {
-                                    setPropertyType(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="select select-bordered w-full"
-                            >
-                                <option value="All">All Types</option>
-                                <option value="Apartment">Apartment</option>
-                                <option value="Flat">Flat</option>
-                                <option value="House">House</option>
-                            </select>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                         {/* Maximum Price */}
                         <div>
@@ -199,11 +202,25 @@ const Properties = () => {
                                 }}
                                 className="select select-bordered w-full"
                             >
-                                <option value="All">Any Price</option>
-                                <option value="20000">Up to ৳20,000</option>
-                                <option value="30000">Up to ৳30,000</option>
-                                <option value="40000">Up to ৳40,000</option>
-                                <option value="60000">Up to ৳60,000</option>
+                                <option value="All">
+                                    Any Price
+                                </option>
+
+                                <option value="20000">
+                                    Up to ৳20,000
+                                </option>
+
+                                <option value="30000">
+                                    Up to ৳30,000
+                                </option>
+
+                                <option value="40000">
+                                    Up to ৳40,000
+                                </option>
+
+                                <option value="60000">
+                                    Up to ৳60,000
+                                </option>
                             </select>
                         </div>
 
@@ -223,11 +240,25 @@ const Properties = () => {
                                 }}
                                 className="select select-bordered w-full"
                             >
-                                <option value="All">Any</option>
-                                <option value="1">1+ Bedroom</option>
-                                <option value="2">2+ Bedrooms</option>
-                                <option value="3">3+ Bedrooms</option>
-                                <option value="4">4+ Bedrooms</option>
+                                <option value="All">
+                                    Any
+                                </option>
+
+                                <option value="1">
+                                    1+ Bedroom
+                                </option>
+
+                                <option value="2">
+                                    2+ Bedrooms
+                                </option>
+
+                                <option value="3">
+                                    3+ Bedrooms
+                                </option>
+
+                                <option value="4">
+                                    4+ Bedrooms
+                                </option>
                             </select>
                         </div>
 
@@ -247,15 +278,16 @@ const Properties = () => {
                                 }}
                                 className="select select-bordered w-full"
                             >
-                                <option value="default">Default</option>
+                                <option value="default">
+                                    Default
+                                </option>
+
                                 <option value="price-low">
                                     Price: Low to High
                                 </option>
+
                                 <option value="price-high">
                                     Price: High to Low
-                                </option>
-                                <option value="area-large">
-                                    Largest Area
                                 </option>
                             </select>
                         </div>
@@ -263,7 +295,6 @@ const Properties = () => {
 
                     {/* Clear Filters */}
                     {(search ||
-                        propertyType !== "All" ||
                         maxPrice !== "All" ||
                         bedrooms !== "All" ||
                         sortBy !== "default") && (
@@ -282,6 +313,7 @@ const Properties = () => {
 
                 {/* Results Header */}
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-6">
+
                     <div>
                         <h2 className="text-2xl font-bold">
                             Available Properties
@@ -294,36 +326,59 @@ const Properties = () => {
 
                     <div className="flex items-center gap-2 text-gray-500">
                         <FaSlidersH />
-                        <span>Use filters to find your ideal home</span>
+                        <span>
+                            Use filters to find your ideal home
+                        </span>
                     </div>
                 </div>
 
-                {/* Property Grid */}
-                {currentProperties.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {currentProperties.map((property) => (
-                            <PropertyCard
-                                key={property.id}
-                                property={property}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bg-base-100 rounded-2xl">
-                        <EmptyState message="Try changing your search or filters." />
+                {/* Loading */}
+                {isLoading && (
+                    <div className="flex justify-center py-20">
+                        <span className="loading loading-spinner loading-lg"></span>
                     </div>
                 )}
 
+                {/* Error */}
+                {!isLoading && error && (
+                    <div className="alert alert-error">
+                        <span>{error}</span>
+                    </div>
+                )}
+
+                {/* Property Grid */}
+                {!isLoading && !error && (
+                    currentProperties.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                            {currentProperties.map((property) => (
+                                <PropertyCard
+                                    key={property.id}
+                                    property={property}
+                                />
+                            ))}
+
+                        </div>
+                    ) : (
+                        <div className="bg-base-100 rounded-2xl">
+                            <EmptyState message="Try changing your search or filters." />
+                        </div>
+                    )
+                )}
+
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {!isLoading && !error && totalPages > 1 && (
                     <div className="flex justify-center mt-12">
                         <div className="join">
+
                             <button
                                 type="button"
                                 className="join-item btn"
                                 disabled={currentPage === 1}
                                 onClick={() =>
-                                    setCurrentPage((page) => page - 1)
+                                    setCurrentPage(
+                                        (page) => page - 1
+                                    )
                                 }
                             >
                                 «
@@ -336,7 +391,9 @@ const Properties = () => {
                                 <button
                                     type="button"
                                     key={page}
-                                    onClick={() => setCurrentPage(page)}
+                                    onClick={() =>
+                                        setCurrentPage(page)
+                                    }
                                     className={`join-item btn ${currentPage === page
                                         ? "btn-primary"
                                         : ""
@@ -349,13 +406,18 @@ const Properties = () => {
                             <button
                                 type="button"
                                 className="join-item btn"
-                                disabled={currentPage === totalPages}
+                                disabled={
+                                    currentPage === totalPages
+                                }
                                 onClick={() =>
-                                    setCurrentPage((page) => page + 1)
+                                    setCurrentPage(
+                                        (page) => page + 1
+                                    )
                                 }
                             >
                                 »
                             </button>
+
                         </div>
                     </div>
                 )}
@@ -365,3 +427,4 @@ const Properties = () => {
 };
 
 export default Properties;
+

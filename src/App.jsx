@@ -25,6 +25,7 @@ import RentalRequests from "./pages/admin/RentalRequests";
 import ManageProperties from "./pages/admin/ManageProperties";
 import AddProperty from "./pages/admin/AddProperty";
 import EditProperty from "./pages/admin/EditProperty";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 function App() {
   return (
@@ -118,6 +119,15 @@ function App() {
             element={
               <AdminRoute>
                 <EditProperty />
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <AdminUsers />
               </AdminRoute>
             }
           />

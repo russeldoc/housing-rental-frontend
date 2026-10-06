@@ -1,10 +1,17 @@
-
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isLoading } = useAuth();
     const location = useLocation();
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center min-h-64">
+                <span className="loading loading-spinner loading-lg"></span>
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         return (

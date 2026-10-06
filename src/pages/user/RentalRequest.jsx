@@ -1,30 +1,23 @@
-
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FaArrowLeft, FaPaperPlane } from "react-icons/fa";
+import toast from "react-hot-toast";
 
-import {
-    getProperties,
-    subscribeToPropertyChanges,
-} from "../../services/propertyStorage";
-
-import {
-    createRentalRequest,
-} from "../../services/rentalRequests";
+import { apiRequest } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 const RentalRequest = () => {
     const { id } = useParams();
+    const { authUser } = useAuth();
 
-    const [property, setProperty] = useState(() =>
-        getProperties().find(
-            (item) => String(item.id) === String(id)
-        )
-    );
+    const [property, setProperty] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
-        renterName: "",
-        userEmail: "",
-        phone: "",
+        renterName: authUser?.name || authUser?.full_name || "",
+        userEmail: authUser?.email || "",
+        phone: authUser?.phone_number || "",
         moveInDate: "",
         message: "",
     });
@@ -34,54 +27,67 @@ const RentalRequest = () => {
         message: "",
     });
 
-    const isUnavailable =
-        property?.availability === "Not Available";
-
+    // Load property from backend
     useEffect(() => {
-        const refreshProperty = () => {
-            const foundProperty = getProperties().find(
-                (item) => String(item.id) === String(id)
-            );
+        const loadProperty = async () => {
+            setIsLoading(true);
 
-            setProperty(foundProperty);
-        };
+            try {
+                let data;
 
-        refreshProperty();
+                try {
+                    // First try to get the property by ID
+                    data = await apiRequest(`/properties/${id}`);
+                } catch (error) {
+                    // If the property is unavailable,
+                    // search for it including unavailable properties
+                    const unavailableData = await apiRequest(
+                        `/properties/?property_id=${id}&is_available=false`
+                    );
 
-        return subscribeToPropertyChanges(refreshProperty);
-    }, [id]);
+                    data = unavailableData.items?.[0];
 
-    // Refresh availability if rental requests change in another tab.
-    useEffect(() => {
-        const handleStorageChange = (event) => {
-            if (
-                event.key === "rentalRequests" ||
-                event.key === null
-            ) {
-                const updatedProperty = getProperties().find(
-                    (item) => String(item.id) === String(id)
-                );
+                    if (!data) {
+                        throw error;
+                    }
+                }
 
-                setProperty(updatedProperty);
+                setProperty(data);
+            } catch (error) {
+                console.error("Failed to load property:", error);
+
+                setFeedback({
+                    type: "error",
+                    message:
+                        error.message || "Could not load property.",
+                });
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        window.addEventListener("storage", handleStorageChange);
-
-        window.addEventListener("focus", handleStorageChange);
-
-        return () => {
-            window.removeEventListener(
-                "storage",
-                handleStorageChange
-            );
-
-            window.removeEventListener(
-                "focus",
-                handleStorageChange
-            );
-        };
+        loadProperty();
     }, [id]);
+
+    // Update user information when authUser loads
+    useEffect(() => {
+        setFormData((previousData) => ({
+            ...previousData,
+
+            renterName:
+                authUser?.name ||
+                authUser?.full_name ||
+                previousData.renterName,
+
+            userEmail:
+                authUser?.email ||
+                previousData.userEmail,
+
+            phone:
+                authUser?.phone_number ||
+                previousData.phone,
+        }));
+    }, [authUser]);
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -91,10 +97,13 @@ const RentalRequest = () => {
             [name]: value,
         }));
 
-        setFeedback({ type: "", message: "" });
+        setFeedback({
+            type: "",
+            message: "",
+        });
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
 
         if (!property) {
@@ -105,64 +114,89 @@ const RentalRequest = () => {
             return;
         }
 
-        // Check current saved data before submitting.
-        const currentProperty = getProperties().find(
-            (item) => String(item.id) === String(id)
-        );
-
-        if (
-            !currentProperty ||
-            currentProperty.availability === "Not Available"
-        ) {
-            setProperty(currentProperty);
-
+        if (!property.is_available) {
             setFeedback({
                 type: "error",
-                message: "Sorry, this property is no longer available.",
+                message:
+                    "Sorry, this property is no longer available.",
             });
             return;
         }
 
-        const result = createRentalRequest({
-            propertyId: property.id,
-            propertyTitle: property.title,
-            renterName: formData.renterName.trim(),
-            userEmail: formData.userEmail.trim().toLowerCase(),
-            phone: formData.phone.trim(),
-            moveInDate: formData.moveInDate,
-            message: formData.message.trim(),
-        });
-
-        if (!result.success) {
-            setFeedback({
-                type: "error",
-                message: result.message,
-            });
-
-            // Refresh in case another request was just approved.
-            setProperty(
-                getProperties().find(
-                    (item) => String(item.id) === String(id)
-                )
-            );
-
-            return;
-        }
+        setIsSubmitting(true);
 
         setFeedback({
-            type: "success",
-            message: "Your rental request has been submitted successfully!",
-        });
-
-        setFormData({
-            renterName: "",
-            userEmail: "",
-            phone: "",
-            moveInDate: "",
+            type: "",
             message: "",
         });
+
+        try {
+            // Backend currently stores message only.
+            // So we include the existing form details inside message.
+            const completeMessage = [
+                `Applicant Name: ${formData.renterName.trim()}`,
+                `Email: ${formData.userEmail.trim()}`,
+                `Phone: ${formData.phone.trim()}`,
+                `Preferred Move-in Date: ${formData.moveInDate}`,
+                "",
+                `Message: ${formData.message.trim() ||
+                "No additional message."
+                }`,
+            ].join("\n");
+
+            await apiRequest("/rental-requests/", {
+                method: "POST",
+
+                body: JSON.stringify({
+                    property_id: Number(property.id),
+                    message: completeMessage,
+                }),
+            });
+
+            toast.success(
+                "Rental request submitted successfully!"
+            );
+
+            setFeedback({
+                type: "success",
+                message:
+                    "Your rental request has been submitted successfully!",
+            });
+
+            setFormData((previousData) => ({
+                ...previousData,
+                moveInDate: "",
+                message: "",
+            }));
+        } catch (error) {
+            console.error("Rental request error:", error);
+
+            setFeedback({
+                type: "error",
+                message:
+                    error.message ||
+                    "Could not submit the rental request.",
+            });
+
+            toast.error(
+                error.message ||
+                "Could not submit the rental request."
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
+    // Loading
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-base-200 flex items-center justify-center">
+                <span className="loading loading-spinner loading-lg text-primary"></span>
+            </div>
+        );
+    }
+
+    // Property not found
     if (!property) {
         return (
             <div className="max-w-3xl mx-auto px-6 py-20 text-center">
@@ -170,7 +204,14 @@ const RentalRequest = () => {
                     Property Not Found
                 </h1>
 
-                <Link to="/properties" className="btn btn-primary">
+                <p className="text-gray-500 mb-6">
+                    We could not find this property.
+                </p>
+
+                <Link
+                    to="/properties"
+                    className="btn btn-primary"
+                >
                     <FaArrowLeft />
                     Back to Properties
                 </Link>
@@ -178,9 +219,13 @@ const RentalRequest = () => {
         );
     }
 
+    const isUnavailable = !property.is_available;
+
     return (
         <div className="min-h-screen bg-base-200 px-4 py-10">
             <div className="max-w-2xl mx-auto">
+
+                {/* Back to property */}
                 <Link
                     to={`/properties/${property.id}`}
                     className="btn btn-ghost mb-6"
@@ -191,6 +236,7 @@ const RentalRequest = () => {
 
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body p-6 md:p-8">
+
                         <h1 className="text-3xl font-bold">
                             Rental Request
                         </h1>
@@ -199,7 +245,9 @@ const RentalRequest = () => {
                             Submit your details to request this property.
                         </p>
 
+                        {/* Property information */}
                         <div className="bg-base-200 rounded-xl p-4 mt-4">
+
                             <h2 className="font-bold text-lg">
                                 {property.title}
                             </h2>
@@ -209,7 +257,10 @@ const RentalRequest = () => {
                             </p>
 
                             <p className="text-primary font-bold mt-2">
-                                ৳{Number(property.price).toLocaleString()}
+                                ৳
+                                {Number(
+                                    property.monthly_rent
+                                ).toLocaleString()}
                                 {" / month"}
                             </p>
 
@@ -220,12 +271,19 @@ const RentalRequest = () => {
                             )}
                         </div>
 
+                        {/* Unavailable message */}
                         {isUnavailable && (
-                            <div role="alert" className="alert alert-error mt-4">
-                                This property has already been approved for another renter. You cannot submit a new rental request.
+                            <div
+                                role="alert"
+                                className="alert alert-error mt-4"
+                            >
+                                This property has already been approved
+                                for another renter. You cannot submit
+                                a new rental request.
                             </div>
                         )}
 
+                        {/* Feedback */}
                         {feedback.message && (
                             <div
                                 role="alert"
@@ -238,13 +296,19 @@ const RentalRequest = () => {
                             </div>
                         )}
 
+                        {/* Form */}
                         {!isUnavailable && (
                             <form
                                 onSubmit={handleSubmit}
                                 className="space-y-4 mt-4"
                             >
+
+                                {/* Full Name */}
                                 <div>
-                                    <label htmlFor="renterName" className="label">
+                                    <label
+                                        htmlFor="renterName"
+                                        className="label"
+                                    >
                                         <span className="label-text font-semibold">
                                             Full Name
                                         </span>
@@ -263,8 +327,12 @@ const RentalRequest = () => {
                                     />
                                 </div>
 
+                                {/* Email */}
                                 <div>
-                                    <label htmlFor="userEmail" className="label">
+                                    <label
+                                        htmlFor="userEmail"
+                                        className="label"
+                                    >
                                         <span className="label-text font-semibold">
                                             Email Address
                                         </span>
@@ -283,8 +351,12 @@ const RentalRequest = () => {
                                     />
                                 </div>
 
+                                {/* Phone */}
                                 <div>
-                                    <label htmlFor="phone" className="label">
+                                    <label
+                                        htmlFor="phone"
+                                        className="label"
+                                    >
                                         <span className="label-text font-semibold">
                                             Phone Number
                                         </span>
@@ -303,8 +375,12 @@ const RentalRequest = () => {
                                     />
                                 </div>
 
+                                {/* Move-in date */}
                                 <div>
-                                    <label htmlFor="moveInDate" className="label">
+                                    <label
+                                        htmlFor="moveInDate"
+                                        className="label"
+                                    >
                                         <span className="label-text font-semibold">
                                             Preferred Move-in Date
                                         </span>
@@ -317,13 +393,19 @@ const RentalRequest = () => {
                                         className="input input-bordered w-full"
                                         value={formData.moveInDate}
                                         onChange={handleChange}
-                                        min={new Date().toLocaleDateString("en-CA")}
+                                        min={new Date().toLocaleDateString(
+                                            "en-CA"
+                                        )}
                                         required
                                     />
                                 </div>
 
+                                {/* Message */}
                                 <div>
-                                    <label htmlFor="message" className="label">
+                                    <label
+                                        htmlFor="message"
+                                        className="label"
+                                    >
                                         <span className="label-text font-semibold">
                                             Message (Optional)
                                         </span>
@@ -341,13 +423,25 @@ const RentalRequest = () => {
                                     />
                                 </div>
 
+                                {/* Submit */}
                                 <button
                                     type="submit"
                                     className="btn btn-primary w-full"
+                                    disabled={isSubmitting}
                                 >
-                                    <FaPaperPlane />
-                                    Submit Rental Request
+                                    {isSubmitting ? (
+                                        <>
+                                            <span className="loading loading-spinner loading-sm"></span>
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaPaperPlane />
+                                            Submit Rental Request
+                                        </>
+                                    )}
                                 </button>
+
                             </form>
                         )}
                     </div>
@@ -358,3 +452,4 @@ const RentalRequest = () => {
 };
 
 export default RentalRequest;
+

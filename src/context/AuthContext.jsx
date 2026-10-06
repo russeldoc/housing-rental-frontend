@@ -1,34 +1,65 @@
-import { createContext, useContext, useState } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+} from "react";
 
-const AuthContext = createContext();
+import { apiRequest } from "../services/api";
 
-const AuthProvider = ({ children }) => {
-    const [authUser, setAuthUser] = useState(() => {
-        const savedUser = localStorage.getItem("authUser");
+const AuthContext = createContext(null);
 
-        return savedUser ? JSON.parse(savedUser) : null;
-    });
+export const AuthProvider = ({ children }) => {
+    const [authUser, setAuthUser] = useState(null);
+    const [token, setToken] = useState(
+        () => localStorage.getItem("token")
+    );
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [token, setToken] = useState(() => {
-        return localStorage.getItem("token") || null;
-    });
+    useEffect(() => {
+        const restoreSession = async () => {
+            const savedToken = localStorage.getItem("token");
 
-    // Login
-    const login = (user, userToken) => {
+            if (!savedToken) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const user = await apiRequest("/auth/me");
+                setAuthUser(user);
+                setToken(savedToken);
+            } catch (error) {
+                localStorage.removeItem("token");
+                localStorage.removeItem("refreshToken");
+                setAuthUser(null);
+                setToken(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        restoreSession();
+    }, []);
+
+    const login = (user, accessToken, refreshToken) => {
+        localStorage.setItem("token", accessToken);
+
+        if (refreshToken) {
+            localStorage.setItem("refreshToken", refreshToken);
+        }
+
+        setToken(accessToken);
         setAuthUser(user);
-        setToken(userToken);
-
-        localStorage.setItem("authUser", JSON.stringify(user));
-        localStorage.setItem("token", userToken);
     };
 
-    // Logout
     const logout = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("authUser");
+
         setAuthUser(null);
         setToken(null);
-
-        localStorage.removeItem("authUser");
-        localStorage.removeItem("token");
     };
 
     const value = {
@@ -36,7 +67,8 @@ const AuthProvider = ({ children }) => {
         token,
         login,
         logout,
-        isAuthenticated: !!authUser,
+        isLoading,
+        isAuthenticated: Boolean(authUser && token),
     };
 
     return (
@@ -46,10 +78,6 @@ const AuthProvider = ({ children }) => {
     );
 };
 
-// Custom hook
-export const useAuth = () => {
-    return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
 
 export default AuthContext;
-export { AuthProvider };

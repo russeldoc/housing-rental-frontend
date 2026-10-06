@@ -1,55 +1,98 @@
-
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+    Link,
+    useLocation,
+    useNavigate,
+} from "react-router-dom";
 import toast from "react-hot-toast";
+
 import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL, apiRequest } from "../services/api";
 
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const { login } = useAuth();
     const navigate = useNavigate();
-
     const location = useLocation();
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Read registered users from localStorage
-        const users = JSON.parse(
-            localStorage.getItem("registeredUsers") || "[]"
-        );
+        if (isSubmitting) return;
 
-        // Find a matching account
-        const user = users.find(
-            (item) =>
-                item.email.toLowerCase() === email.trim().toLowerCase() &&
-                item.password === password
-        );
+        setIsSubmitting(true);
 
-        if (!user) {
-            toast.error("Invalid email or password!");
-            return;
-        }
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/auth/login`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email: email.trim(),
+                        password,
+                    }),
+                }
+            );
 
-        // Demo token only. FastAPI will provide the real JWT later.
-        const demoToken = `demo-token-${Date.now()}`;
+            const data = await response.json().catch(() => null);
 
-        const { password: savedPassword, ...safeUser } = user;
+            if (!response.ok) {
+                throw new Error(
+                    data?.detail || "Login failed."
+                );
+            }
 
-        login(safeUser, demoToken);
+            if (!data?.access_token) {
+                throw new Error(
+                    "The server did not return an access token."
+                );
+            }
 
-        toast.success("Login successful!");
+            // Store the token before requesting the profile.
+            localStorage.setItem("token", data.access_token);
 
-        const requestedPath = location.state?.from?.pathname;
+            if (data.refresh_token) {
+                localStorage.setItem(
+                    "refreshToken",
+                    data.refresh_token
+                );
+            }
 
-        if (requestedPath?.startsWith("/") && !requestedPath.startsWith("//")) {
-            navigate(requestedPath, { replace: true });
-        } else if (safeUser.role === "admin") {
-            navigate("/admin", { replace: true });
-        } else {
-            navigate("/dashboard", { replace: true });
+            const user = await apiRequest("/auth/me");
+
+            login(
+                user,
+                data.access_token,
+                data.refresh_token
+            );
+
+            toast.success("Login successful!");
+
+            const requestedPath = location.state?.from?.pathname;
+
+            if (
+                requestedPath?.startsWith("/") &&
+                !requestedPath.startsWith("//")
+            ) {
+                navigate(requestedPath, { replace: true });
+            } else if (user.role === "admin") {
+                navigate("/admin", { replace: true });
+            } else {
+                navigate("/dashboard", { replace: true });
+            }
+        } catch (error) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("refreshToken");
+
+            toast.error(error.message || "Unable to sign in.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -65,10 +108,15 @@ const Login = () => {
                         Sign in to your HomeRent account
                     </p>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-4"
+                    >
                         <div>
                             <label className="label">
-                                <span className="label-text">Email Address</span>
+                                <span className="label-text">
+                                    Email Address
+                                </span>
                             </label>
 
                             <input
@@ -76,14 +124,19 @@ const Login = () => {
                                 className="input input-bordered w-full"
                                 placeholder="you@example.com"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) =>
+                                    setEmail(e.target.value)
+                                }
+                                autoComplete="email"
                                 required
                             />
                         </div>
 
                         <div>
                             <label className="label">
-                                <span className="label-text">Password</span>
+                                <span className="label-text">
+                                    Password
+                                </span>
                             </label>
 
                             <input
@@ -91,7 +144,10 @@ const Login = () => {
                                 className="input input-bordered w-full"
                                 placeholder="Enter your password"
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                onChange={(e) =>
+                                    setPassword(e.target.value)
+                                }
+                                autoComplete="current-password"
                                 required
                             />
                         </div>
@@ -105,14 +161,23 @@ const Login = () => {
                             </Link>
                         </div>
 
-                        <button type="submit" className="btn btn-primary w-full">
-                            Sign In
+                        <button
+                            type="submit"
+                            className="btn btn-primary w-full"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting
+                                ? "Signing in..."
+                                : "Sign In"}
                         </button>
                     </form>
 
                     <p className="text-center mt-4">
                         Don't have an account?{" "}
-                        <Link to="/signup" className="link link-primary font-semibold">
+                        <Link
+                            to="/signup"
+                            className="link link-primary font-semibold"
+                        >
                             Sign Up
                         </Link>
                     </p>

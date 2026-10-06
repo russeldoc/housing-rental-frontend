@@ -1,13 +1,9 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaSave } from "react-icons/fa";
 import toast from "react-hot-toast";
 
-import {
-    getProperties,
-    updateProperty,
-} from "../../services/propertyStorage";
+import { apiRequest } from "../../services/api";
 
 const EditProperty = () => {
     const { id } = useParams();
@@ -16,29 +12,32 @@ const EditProperty = () => {
     const [formData, setFormData] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Load property from FastAPI
     useEffect(() => {
-        const property = getProperties().find(
-            (item) => item.id === Number(id)
-        );
+        const loadProperty = async () => {
+            try {
+                const property = await apiRequest(`/properties/${id}`);
 
-        if (!property) {
-            toast.error("Property not found.");
-            navigate("/admin/properties", { replace: true });
-            return;
-        }
+                setFormData({
+                    title: property.title ?? "",
+                    location: property.location ?? "",
+                    price: property.monthly_rent ?? "",
+                    bedrooms: property.bedrooms ?? 1,
+                    bathrooms: property.bathrooms ?? 1,
+                    image: property.image_url ?? "",
+                    description: property.description ?? "",
+                    status: property.is_available
+                        ? "Available"
+                        : "Not Available",
+                });
+            } catch (error) {
+                console.error("Error loading property:", error);
+                toast.error("Property not found.");
+                navigate("/admin/properties", { replace: true });
+            }
+        };
 
-        setFormData({
-            title: property.title ?? "",
-            location: property.location ?? "",
-            price: property.price ?? "",
-            bedrooms: property.bedrooms ?? 1,
-            bathrooms: property.bathrooms ?? 1,
-            area: property.area ?? "",
-            type: property.type ?? "Apartment",
-            status: property.status ?? "Available",
-            image: property.image ?? "",
-            description: property.description ?? "",
-        });
+        loadProperty();
     }, [id, navigate]);
 
     const handleChange = (e) => {
@@ -50,14 +49,13 @@ const EditProperty = () => {
         }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (
             !formData.title.trim() ||
             !formData.location.trim() ||
             !formData.price ||
-            !formData.area ||
             !formData.image.trim() ||
             !formData.description.trim()
         ) {
@@ -67,9 +65,8 @@ const EditProperty = () => {
 
         if (
             Number(formData.price) <= 0 ||
-            Number(formData.area) <= 0 ||
-            Number(formData.bedrooms) < 0 ||
-            Number(formData.bathrooms) < 0
+            Number(formData.bedrooms) < 1 ||
+            Number(formData.bathrooms) < 1
         ) {
             toast.error("Please enter valid property numbers.");
             return;
@@ -78,32 +75,38 @@ const EditProperty = () => {
         setIsSubmitting(true);
 
         try {
-            const updatedProperties = updateProperty(Number(id), {
-                ...formData,
-                title: formData.title.trim(),
-                location: formData.location.trim(),
-                description: formData.description.trim(),
-                image: formData.image.trim(),
-                price: Number(formData.price),
-                bedrooms: Number(formData.bedrooms),
-                bathrooms: Number(formData.bathrooms),
-                area: Number(formData.area),
-            });
-
-            const propertyExists = updatedProperties.some(
-                (property) => property.id === Number(id)
+            // Send updated property to FastAPI
+            const updatedProperty = await apiRequest(
+                `/properties/${id}`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({
+                        title: formData.title.trim(),
+                        description: formData.description.trim(),
+                        location: formData.location.trim(),
+                        monthly_rent: Number(formData.price),
+                        bedrooms: Number(formData.bedrooms),
+                        bathrooms: Number(formData.bathrooms),
+                        image_url: formData.image.trim(),
+                        is_available:
+                            formData.status === "Available",
+                    }),
+                }
             );
 
-            if (!propertyExists) {
-                toast.error("Could not update this property.");
-                return;
-            }
+            console.log(
+                "Updated property from backend:",
+                updatedProperty
+            );
 
             toast.success("Property updated successfully!");
+
             navigate("/admin/properties");
         } catch (error) {
             console.error("Error updating property:", error);
-            toast.error("Could not update the property.");
+            toast.error(
+                error.message || "Could not update the property."
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -120,6 +123,7 @@ const EditProperty = () => {
     return (
         <div className="min-h-screen bg-base-200 px-4 py-10">
             <div className="max-w-4xl mx-auto">
+
                 <Link
                     to="/admin/properties"
                     className="btn btn-ghost mb-5"
@@ -130,6 +134,7 @@ const EditProperty = () => {
 
                 <div className="card bg-base-100 shadow-xl">
                     <div className="card-body">
+
                         <h1 className="text-3xl font-bold">
                             Edit Property
                         </h1>
@@ -139,7 +144,9 @@ const EditProperty = () => {
                         </p>
 
                         <form onSubmit={handleSubmit}>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
                                 {/* Property Title */}
                                 <div className="form-control">
                                     <label className="label">
@@ -147,6 +154,7 @@ const EditProperty = () => {
                                             Property Title *
                                         </span>
                                     </label>
+
                                     <input
                                         type="text"
                                         name="title"
@@ -164,6 +172,7 @@ const EditProperty = () => {
                                             Location *
                                         </span>
                                     </label>
+
                                     <input
                                         type="text"
                                         name="location"
@@ -181,28 +190,11 @@ const EditProperty = () => {
                                             Monthly Rent (৳) *
                                         </span>
                                     </label>
+
                                     <input
                                         type="number"
                                         name="price"
                                         value={formData.price}
-                                        onChange={handleChange}
-                                        min="1"
-                                        className="input input-bordered w-full"
-                                        required
-                                    />
-                                </div>
-
-                                {/* Area */}
-                                <div className="form-control">
-                                    <label className="label">
-                                        <span className="label-text font-semibold">
-                                            Area (sq ft) *
-                                        </span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="area"
-                                        value={formData.area}
                                         onChange={handleChange}
                                         min="1"
                                         className="input input-bordered w-full"
@@ -217,12 +209,13 @@ const EditProperty = () => {
                                             Bedrooms *
                                         </span>
                                     </label>
+
                                     <input
                                         type="number"
                                         name="bedrooms"
                                         value={formData.bedrooms}
                                         onChange={handleChange}
-                                        min="0"
+                                        min="1"
                                         className="input input-bordered w-full"
                                         required
                                     />
@@ -235,37 +228,16 @@ const EditProperty = () => {
                                             Bathrooms *
                                         </span>
                                     </label>
+
                                     <input
                                         type="number"
                                         name="bathrooms"
                                         value={formData.bathrooms}
                                         onChange={handleChange}
-                                        min="0"
+                                        min="1"
                                         className="input input-bordered w-full"
                                         required
                                     />
-                                </div>
-
-                                {/* Property Type */}
-                                <div className="form-control">
-                                    <label className="label">
-                                        <span className="label-text font-semibold">
-                                            Property Type *
-                                        </span>
-                                    </label>
-                                    <select
-                                        name="type"
-                                        value={formData.type}
-                                        onChange={handleChange}
-                                        className="select select-bordered w-full"
-                                        required
-                                    >
-                                        <option value="Apartment">
-                                            Apartment
-                                        </option>
-                                        <option value="Flat">Flat</option>
-                                        <option value="House">House</option>
-                                    </select>
                                 </div>
 
                                 {/* Status */}
@@ -275,6 +247,7 @@ const EditProperty = () => {
                                             Status *
                                         </span>
                                     </label>
+
                                     <select
                                         name="status"
                                         value={formData.status}
@@ -285,7 +258,10 @@ const EditProperty = () => {
                                         <option value="Available">
                                             Available
                                         </option>
-                                        <option value="Rented">Rented</option>
+
+                                        <option value="Not Available">
+                                            Not Available
+                                        </option>
                                     </select>
                                 </div>
 
@@ -296,6 +272,7 @@ const EditProperty = () => {
                                             Image URL *
                                         </span>
                                     </label>
+
                                     <input
                                         type="url"
                                         name="image"
@@ -304,6 +281,7 @@ const EditProperty = () => {
                                         className="input input-bordered w-full"
                                         required
                                     />
+
                                     {formData.image && (
                                         <img
                                             src={formData.image}
@@ -320,6 +298,7 @@ const EditProperty = () => {
                                             Description *
                                         </span>
                                     </label>
+
                                     <textarea
                                         name="description"
                                         value={formData.description}
@@ -328,9 +307,12 @@ const EditProperty = () => {
                                         required
                                     />
                                 </div>
+
                             </div>
 
+                            {/* Buttons */}
                             <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
+
                                 <Link
                                     to="/admin/properties"
                                     className="btn btn-outline"
@@ -344,11 +326,14 @@ const EditProperty = () => {
                                     disabled={isSubmitting}
                                 >
                                     <FaSave />
+
                                     {isSubmitting
                                         ? "Saving..."
                                         : "Save Changes"}
                                 </button>
+
                             </div>
+
                         </form>
                     </div>
                 </div>

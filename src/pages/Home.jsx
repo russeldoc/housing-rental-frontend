@@ -1,27 +1,41 @@
-
 import { Link } from "react-router-dom";
 import { FaSearch, FaArrowRight } from "react-icons/fa";
 import { useEffect, useState } from "react";
 
 import PropertyCard from "../components/PropertyCard";
-import {
-    getProperties,
-    subscribeToPropertyChanges,
-} from "../services/propertyStorage";
-
-
+import { apiRequest } from "../services/api";
 
 const Home = () => {
-    const [properties, setProperties] = useState(() => getProperties());
+    const [properties, setProperties] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState("");
 
+    // Get properties from FastAPI
     useEffect(() => {
-        return subscribeToPropertyChanges(() => {
-            setProperties(getProperties());
-        });
+        const loadProperties = async () => {
+            try {
+                setIsLoading(true);
+                setError("");
+
+                const data = await apiRequest(
+                    "/properties/?page=1&page_size=3&is_available=true"
+                );
+
+                setProperties(data.items || []);
+            } catch (error) {
+                console.error("Failed to load featured properties:", error);
+                setError(
+                    error.message || "Failed to load properties."
+                );
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadProperties();
     }, []);
 
     const featuredProperties = properties.slice(0, 3);
-
 
     return (
         <div>
@@ -50,7 +64,9 @@ const Home = () => {
 
                             <h1 className="text-4xl md:text-6xl font-bold leading-tight">
                                 Find a Place You Can
-                                <span className="text-primary"> Call Home</span>
+                                <span className="text-primary">
+                                    {" "}Call Home
+                                </span>
                             </h1>
 
                             <p className="py-6 text-lg max-w-2xl mx-auto text-gray-200">
@@ -71,17 +87,39 @@ const Home = () => {
                                     />
 
                                     <select className="select select-bordered w-full">
-                                        <option value="">Property Type</option>
-                                        <option value="Apartment">Apartment</option>
-                                        <option value="Flat">Flat</option>
-                                        <option value="House">House</option>
+                                        <option value="">
+                                            Property Type
+                                        </option>
+
+                                        <option value="Apartment">
+                                            Apartment
+                                        </option>
+
+                                        <option value="Flat">
+                                            Flat
+                                        </option>
+
+                                        <option value="House">
+                                            House
+                                        </option>
                                     </select>
 
                                     <select className="select select-bordered w-full">
-                                        <option value="">Price Range</option>
-                                        <option value="10000">৳10,000 - ৳20,000</option>
-                                        <option value="20000">৳20,000 - ৳30,000</option>
-                                        <option value="30000">৳30,000 - ৳50,000</option>
+                                        <option value="">
+                                            Price Range
+                                        </option>
+
+                                        <option value="10000">
+                                            ৳10,000 - ৳20,000
+                                        </option>
+
+                                        <option value="20000">
+                                            ৳20,000 - ৳30,000
+                                        </option>
+
+                                        <option value="30000">
+                                            ৳30,000 - ৳50,000
+                                        </option>
                                     </select>
 
                                     <Link
@@ -138,16 +176,43 @@ const Home = () => {
                 </div>
 
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Loading */}
+                {isLoading && (
+                    <div className="flex justify-center py-16">
+                        <span className="loading loading-spinner loading-lg"></span>
+                    </div>
+                )}
 
-                    {featuredProperties.map((property) => (
-                        <PropertyCard
-                            key={property.id}
-                            property={property}
-                        />
-                    ))}
 
-                </div>
+                {/* Error */}
+                {!isLoading && error && (
+                    <div className="alert alert-error">
+                        <span>{error}</span>
+                    </div>
+                )}
+
+
+                {/* Properties */}
+                {!isLoading && !error && (
+                    featuredProperties.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                            {featuredProperties.map((property) => (
+                                <PropertyCard
+                                    key={property.id}
+                                    property={property}
+                                />
+                            ))}
+
+                        </div>
+                    ) : (
+                        <div className="text-center py-16">
+                            <p className="text-gray-500">
+                                No available properties found.
+                            </p>
+                        </div>
+                    )
+                )}
 
             </section>
 
@@ -264,3 +329,4 @@ const Home = () => {
 };
 
 export default Home;
+
