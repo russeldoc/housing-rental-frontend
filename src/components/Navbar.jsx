@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaHome, FaBars, FaTimes } from "react-icons/fa";
@@ -21,6 +20,8 @@ const Navbar = () => {
 
     return (
         <nav className="navbar bg-base-100 shadow-md px-4 md:px-8 sticky top-0 z-50">
+
+            {/* Left - Logo */}
             <div className="flex-1">
                 <Link
                     to="/"
@@ -32,12 +33,23 @@ const Navbar = () => {
                 </Link>
             </div>
 
-            {/* Desktop navigation */}
-            <div className="hidden md:flex items-center gap-2">
-                <Link to="/" className="btn btn-ghost">Home</Link>
-                <Link to="/properties" className="btn btn-ghost">Properties</Link>
-                <Link to="/about" className="btn btn-ghost">About</Link>
+            {/* Center - Desktop Navigation */}
+            <div className="hidden md:flex flex-none items-center gap-2">
+                <Link to="/" className="btn btn-ghost">
+                    Home
+                </Link>
 
+                <Link to="/properties" className="btn btn-ghost">
+                    Properties
+                </Link>
+
+                <Link to="/about" className="btn btn-ghost">
+                    About
+                </Link>
+            </div>
+
+            {/* Right - Authentication */}
+            <div className="hidden md:flex flex-1 justify-end items-center gap-2">
                 {isAuthenticated ? (
                     <>
                         {authUser?.role === "admin" ? (
@@ -63,9 +75,13 @@ const Navbar = () => {
                     </>
                 ) : (
                     <>
-                        <Link to="/login" className="btn btn-outline btn-primary">
+                        <Link
+                            to="/login"
+                            className="btn btn-outline btn-primary"
+                        >
                             Login
                         </Link>
+
                         <Link to="/signup" className="btn btn-primary">
                             Sign Up
                         </Link>
@@ -78,7 +94,11 @@ const Navbar = () => {
                 type="button"
                 className="btn btn-ghost btn-square md:hidden"
                 onClick={() => setMenuOpen((open) => !open)}
-                aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+                aria-label={
+                    menuOpen
+                        ? "Close navigation menu"
+                        : "Open navigation menu"
+                }
                 aria-expanded={menuOpen}
             >
                 {menuOpen ? <FaTimes /> : <FaBars />}
@@ -87,13 +107,28 @@ const Navbar = () => {
             {/* Mobile navigation */}
             {menuOpen && (
                 <div className="absolute top-full left-0 w-full bg-base-100 shadow-lg p-4 flex flex-col gap-2 md:hidden">
-                    <Link to="/" onClick={closeMenu} className="btn btn-ghost justify-start">
+
+                    <Link
+                        to="/"
+                        onClick={closeMenu}
+                        className="btn btn-ghost justify-start"
+                    >
                         Home
                     </Link>
-                    <Link to="/properties" onClick={closeMenu} className="btn btn-ghost justify-start">
+
+                    <Link
+                        to="/properties"
+                        onClick={closeMenu}
+                        className="btn btn-ghost justify-start"
+                    >
                         Properties
                     </Link>
-                    <Link to="/about" onClick={closeMenu} className="btn btn-ghost justify-start">
+
+                    <Link
+                        to="/about"
+                        onClick={closeMenu}
+                        className="btn btn-ghost justify-start"
+                    >
                         About
                     </Link>
 
@@ -104,25 +139,45 @@ const Navbar = () => {
                             </div>
 
                             {authUser?.role === "admin" ? (
-                                <Link to="/admin" onClick={closeMenu} className="btn btn-ghost justify-start">
+                                <Link
+                                    to="/admin"
+                                    onClick={closeMenu}
+                                    className="btn btn-ghost justify-start"
+                                >
                                     Admin Dashboard
                                 </Link>
                             ) : (
-                                <Link to="/dashboard" onClick={closeMenu} className="btn btn-ghost justify-start">
+                                <Link
+                                    to="/dashboard"
+                                    onClick={closeMenu}
+                                    className="btn btn-ghost justify-start"
+                                >
                                     Dashboard
                                 </Link>
                             )}
 
-                            <button onClick={handleLogout} className="btn btn-outline btn-error">
+                            <button
+                                onClick={handleLogout}
+                                className="btn btn-outline btn-error"
+                            >
                                 Logout
                             </button>
                         </>
                     ) : (
                         <>
-                            <Link to="/login" onClick={closeMenu} className="btn btn-outline btn-primary">
+                            <Link
+                                to="/login"
+                                onClick={closeMenu}
+                                className="btn btn-outline btn-primary"
+                            >
                                 Login
                             </Link>
-                            <Link to="/signup" onClick={closeMenu} className="btn btn-primary">
+
+                            <Link
+                                to="/signup"
+                                onClick={closeMenu}
+                                className="btn btn-primary"
+                            >
                                 Sign Up
                             </Link>
                         </>
