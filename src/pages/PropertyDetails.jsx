@@ -65,8 +65,9 @@ const PropertyDetails = () => {
     // Check whether the logged-in user already has a rental request
     useEffect(() => {
         const loadExistingRequest = async () => {
+            setExistingRequest(null);   // NEW: clear the old property's request first
+
             if (!authUser) {
-                setExistingRequest(null);
                 return;
             }
 
@@ -77,13 +78,13 @@ const PropertyDetails = () => {
                     `/rental-requests/my?property_id=${id}&page=1&page_size=100`
                 );
 
-                const requests = data.items || [];
+                const requests = (data.items || []).filter(
+                    (item) => Number(item.property_id) === Number(id)
+                );
 
-                // Prefer an active/pending request if there is one.
+                // Prefer a pending request; otherwise show the latest one for THIS property.
                 const request =
-                    requests.find(
-                        (item) => item.status === "pending"
-                    ) ||
+                    requests.find((item) => item.status === "pending") ||
                     requests[0] ||
                     null;
 
@@ -184,8 +185,8 @@ const PropertyDetails = () => {
 
                                 <div
                                     className={`badge mb-3 ${isUnavailable
-                                            ? "badge-error"
-                                            : "badge-primary"
+                                        ? "badge-error"
+                                        : "badge-primary"
                                         }`}
                                 >
                                     {isUnavailable
@@ -315,6 +316,12 @@ const PropertyDetails = () => {
                                     </Link>
 
                                 </div>
+
+                            ) : authUser?.role === "admin" ? (
+
+                                <span className="text-sm opacity-90">
+                                    Admins cannot submit rental requests.
+                                </span>
 
                             ) : authUser ? (
 
