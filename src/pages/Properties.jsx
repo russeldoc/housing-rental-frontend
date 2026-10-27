@@ -31,8 +31,10 @@ const Properties = () => {
                 setIsLoading(true);
                 setError("");
 
+                // CHANGED (1): removed is_available=true and added
+                // include_unavailable=true so rented properties are returned too.
                 const data = await apiRequest(
-                    "/properties/?page=1&page_size=100&is_available=true"
+                    "/properties/?page=1&page_size=100&include_unavailable=true"
                 );
                 // console.log("Properties from backend:", data.items);
                 // console.log("First property:", data.items[0]);
@@ -109,6 +111,12 @@ const Properties = () => {
             );
         }
 
+        // CHANGED (2, optional): show available properties before rented ones.
+        // Sort is stable, so the price order above is kept inside each group.
+        result.sort(
+            (a, b) => Number(b.is_available) - Number(a.is_available)
+        );
+
         return result;
     }, [
         properties,
@@ -155,7 +163,7 @@ const Properties = () => {
                     </h1>
 
                     <p className="mt-4 max-w-2xl opacity-90">
-                        Search through our available houses and flats
+                        Search through our houses and flats
                         to find a place that matches your needs.
                     </p>
                 </div>
@@ -315,8 +323,9 @@ const Properties = () => {
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-6">
 
                     <div>
+                        {/* CHANGED (3, optional): heading no longer says "Available" */}
                         <h2 className="text-2xl font-bold">
-                            Available Properties
+                            All Properties
                         </h2>
 
                         <p className="text-gray-500 mt-1">
@@ -427,4 +436,3 @@ const Properties = () => {
 };
 
 export default Properties;
-

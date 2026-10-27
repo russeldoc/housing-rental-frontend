@@ -5,7 +5,6 @@ export const API_BASE_URL =
     "http://127.0.0.1:8000";
 
 
-
 export async function apiRequest(endpoint, options = {}) {
     const token = localStorage.getItem("token");
 
@@ -120,17 +119,22 @@ export async function apiRequest(endpoint, options = {}) {
                 .catch(() => null);
 
             if (!retryResponse.ok) {
-                throw new Error(
+                // CHANGED: mark this as a normal API error so the catch block
+                // below does not log the user out for it (e.g. 403, 409).
+                const apiError = new Error(
                     retryData?.detail ||
                     `Request failed (${retryResponse.status})`
                 );
+                apiError.isApiError = true;
+                throw apiError;
             }
 
             return retryData;
         } catch (error) {
-            // If the error is already our session-expired error,
-            // just pass it through.
+            // CHANGED: pass through normal API errors from the retried request,
+            // and the session-expired errors thrown above.
             if (
+                error.isApiError ||
                 error.message ===
                 "Your session has expired. Please login again." ||
                 error.message ===
@@ -139,6 +143,7 @@ export async function apiRequest(endpoint, options = {}) {
                 throw error;
             }
 
+            // Anything else (e.g. network failure during refresh)
             localStorage.removeItem("token");
             localStorage.removeItem("refreshToken");
             localStorage.removeItem("authUser");
@@ -156,4 +161,3 @@ export async function apiRequest(endpoint, options = {}) {
         data?.detail || `Request failed (${response.status})`
     );
 }
-
